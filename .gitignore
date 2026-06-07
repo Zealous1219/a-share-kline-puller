@@ -1,0 +1,27 @@
+# Wind API key
+.keys.json
+
+# 跨日计数
+.today_count
+
+# 进度文件备份
+.bak_pre_batch_*
+.bak_v1.2_*
+.bak_20260607*
+.bak_20260607_*
+
+# 阶段 1 完整性证明
+.stage1_baseline.json
+.stage2_baseline.json
+
+# 临时文件（PowerShell 调 node 时用）
+temp_call.js
+.smoke_test_call.js
+*.tmp
+
+# 批量日志
+batch_log/
+
+# OS 杂项
+Thumbs.db
+.DS_Store
