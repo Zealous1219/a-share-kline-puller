@@ -36,3 +36,6 @@ index/*.csv
 _archive/
 _backup/
 _tmp/
+
+# 商业 AI agent（不随工程分发）
+.agents/
