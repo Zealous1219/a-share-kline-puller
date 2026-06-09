@@ -69,6 +69,28 @@ $preBak = "$BackupDir\拉取进度.json.bak_pre_batch_$ts.json"
 [System.IO.File]::Copy($ProgressFile, $preBak, $true)
 Log "pre-batch 备份: $preBak"
 
+# ===== 3f. 磁盘预估 =====
+$pendingCount = ($progress.stocks.PSObject.Properties.Value | Where-Object { $_.status -eq 'pending' }).Count
+$driveRoot = [System.IO.Path]::GetPathRoot($ProgressFile)[0]
+try {
+    $driveInfo = Get-PSDrive -Name $driveRoot -ErrorAction Stop
+    $diskFreeGB = [math]::Round($driveInfo.Free / 1GB, 1)
+    $csvDir = "D:\data\A-shares"
+    $csvSamples = @(Get-ChildItem $csvDir -Filter "*.csv" -ErrorAction SilentlyContinue | Get-Random -Count 5)
+    $avgBytes = if ($csvSamples.Count -gt 0) {
+        ($csvSamples | ForEach-Object { $_.Length } | Measure-Object -Average).Average
+    } else {
+        302592  # 295.5KB fallback
+    }
+    $diskEstimatedGB = [math]::Round($avgBytes * $pendingCount / 1GB, 2)
+    Log "磁盘预估: pending=$pendingCount avg=$([math]::Round($avgBytes/1KB,1))KB -> ~${diskEstimatedGB}GB (free=${diskFreeGB}GB)"
+    if ($diskFreeGB -lt 3) { Log "WARN: 磁盘空间不足: free=${diskFreeGB}GB < 3GB" }
+} catch {
+    Log "磁盘预估: skipped (无法读取磁盘信息)"
+    $diskEstimatedGB = "N/A"
+    $diskFreeGB = "N/A"
+}
+
 # ===== 9.3 19 字段校验 =====
 $sample10 = @($progress.stocks.PSObject.Properties.Value | Get-Random -Count 10)
 $schemaOk = $true
@@ -91,9 +113,9 @@ if ([System.IO.File]::Exists($todayFile)) {
     $tc = [System.IO.File]::ReadAllText($todayFile, [System.Text.Encoding]::UTF8) -split '\|'
     if ($tc[0] -eq $todayKey) { $todayCount = [int]$tc[1] }
 }
-$todayCount++
+$todayCount += $Count
 $quotaLeft = 1000 - $todayCount
-if ($quotaLeft -lt $Count) { Log "WARN: 本日 Wind quota 紧张: 已用 $todayCount, 剩 $quotaLeft, 本批 $Count" }
+if ($quotaLeft -lt $Count) { Log "INFO: 本日 Wind 计数: 已用 $todayCount / 1000, 本批 $Count" }
 Log "当日 Wind 调用计数: $todayCount / 1000"
 
 $nowUtc = (Get-Date).ToUniversalTime()
@@ -167,6 +189,7 @@ Log "Batch 启动: category=$Category count=$Count (queue=$($pending.Count))"
 
 $success = 0; $failed = 0; $abortByRate = $false
 
+$nodePath = (Get-Command node.exe -ErrorAction Stop).Source
 foreach ($internalCode in $batch) {
     $stock = $progress.stocks.$internalCode
     $sym = Parse-Symbol $stock.windCode
@@ -185,16 +208,21 @@ foreach ($internalCode in $batch) {
     Log "拉取: $internalCode ($($stock.windCode)) via $($srv.Srv)"
 
     try {
-        $nodePath = 'C:\Program Files\nodejs\node.exe'
         $nodePathJs = $nodePath.Replace('\', '/')
         $cliMjs = 'D:\data\.agents\skills\wind-mcp-skill\scripts\cli.mjs'.Replace('\', '/')
         $windcode = $stock.windCode
         $callScript = @"
-const { execSync } = require('child_process');
+const { spawnSync } = require('child_process');
 const params = '{"windcode":"$windcode","begin_date":"19900101","end_date":"20261231","period":"10","aftype":"0"}';
-const cmd = '"$nodePathJs" $cliMjs call $($srv.Srv) $($srv.Tool) "' + params.replace(/"/g, '\\"') + '"';
-const result = execSync(cmd, { encoding: 'utf8', maxBuffer: 10 * 1024 * 1024 });
-process.stdout.write(result);
+const cliPath = '$cliMjs';
+const result = spawnSync('$nodePathJs', [cliPath, 'call', '$($srv.Srv)', '$($srv.Tool)', params], {
+  encoding: 'utf8',
+  maxBuffer: 10 * 1024 * 1024,
+  shell: false
+});
+if (result.error) { process.stdout.write(JSON.stringify({isError:true,message:result.error.message})); process.exit(1); }
+if (result.status !== 0) { process.stdout.write(JSON.stringify({isError:true,status:result.status,stderr:result.stderr})); process.exit(1); }
+process.stdout.write(result.stdout);
 "@
         $callScript | Out-File -FilePath "$TmpDir\temp_call.js" -Encoding UTF8 -NoNewline
         $raw = & "$nodePath" "$TmpDir\temp_call.js" 2>&1 | Out-String
@@ -228,6 +256,7 @@ process.stdout.write(result);
         $stock.leaseUntil = (Get-Date).AddMinutes(30).ToString('o')
         $stock.heartbeatAt = $null
         $stock.historyStatus = if ($rowCount -ge 100) { 'normal' } elseif ($rowCount -gt 0) { 'short_history' } else { 'no_data_candidate' }
+        $stock.failCount = $null
         $stock.historyReason = if ($rowCount -eq 0) { '新上市/已退市/暂无数据' } else { $null }
         $stock.needsManualReview = ($rowCount -lt 100)
         $success++
@@ -251,9 +280,9 @@ process.stdout.write(result);
         $stock.claimedAt = $null
         $stock.leaseUntil = (Get-Date).AddMinutes(30).ToString('o')
         $stock.heartbeatAt = $null
-        $stock.historyStatus = 'normal'
+        $stock.historyStatus = 'failed'
         $stock.historyReason = "failed: $errMsg"
-        $stock.needsManualReview = $false
+        $stock.needsManualReview = $true
         $failed++
     }
 
@@ -269,9 +298,41 @@ process.stdout.write(result);
     Start-Sleep -Seconds 2
 }
 
+# ===== categories 同步 =====
+$catData = $progress.categories.$Category
+$catData.completed = @($progress.stocks.PSObject.Properties.Value | Where-Object { $_.category -eq $Category -and $_.status -eq 'success' }).Count
+$catData.failed    = @($progress.stocks.PSObject.Properties.Value | Where-Object { $_.category -eq $Category -and $_.status -eq 'abandoned' }).Count
+$catData.pending   = @($progress.stocks.PSObject.Properties.Value | Where-Object { $_.category -eq $Category -and $_.status -eq 'pending' }).Count
+
 # 写当日 Wind 调用计数
 if (-not [System.IO.Directory]::Exists($TmpDir)) { [System.IO.Directory]::CreateDirectory($TmpDir) | Out-Null }
 [System.IO.File]::WriteAllText($todayFile, "$todayKey|$todayCount", [System.Text.UTF8Encoding]::new($false))
 
+# ===== 3g. 自检报告 =====
+$totalEntry = @($progress.stocks.PSObject.Properties).Count
+$pendingNow = @($progress.stocks.PSObject.Properties.Value | Where-Object { $_.status -eq 'pending' }).Count
+$successNow = @($progress.stocks.PSObject.Properties.Value | Where-Object { $_.status -eq 'success' }).Count
+$abandonedNow = @($progress.stocks.PSObject.Properties.Value | Where-Object { $_.status -eq 'abandoned' }).Count
+$gradingNormal = @($progress.stocks.PSObject.Properties.Value | Where-Object { $_.historyStatus -eq 'normal' }).Count
+$gradingShort = @($progress.stocks.PSObject.Properties.Value | Where-Object { $_.historyStatus -eq 'short_history' }).Count
+$gradingNoData = @($progress.stocks.PSObject.Properties.Value | Where-Object { $_.historyStatus -eq 'no_data_candidate' }).Count
+$reviewQueueCount = 0
+if ([System.IO.File]::Exists("D:\data\拉取进度.review_queue.json")) {
+    $rq = [System.IO.File]::ReadAllText("D:\data\拉取进度.review_queue.json", [System.Text.Encoding]::UTF8) | ConvertFrom-Json
+    $reviewQueueCount = @($rq.PSObject.Properties).Count
+}
+
+Log "--- 自检报告 ---"
+Log "  batch:    success=$success failed=$failed aborted=$abortByRate"
+Log "  progress: total=$totalEntry pending=$pendingNow success=$successNow abandoned=$abandonedNow"
+Log "  grading:  normal=$gradingNormal short_history=$gradingShort no_data_candidate=$gradingNoData"
+Log "  disk:     estimated=~${diskEstimatedGB}GB free=${diskFreeGB}GB"
+Log "  schema:   19 fields verified at start"
+Log "  lock:     active=$($staleActive.Count) hist=$historicalTraces"
+Log "  today:    $todayCount / 1000 (quota left=$($quotaLeft - 0))"
+if ($reviewQueueCount -gt 0) { Log "  review:   $reviewQueueCount entries in review_queue.json" }
+Log "  baseline: progress.json=$(if([System.IO.File]::Exists($ProgressFile)){(Get-Item $ProgressFile).Length}else{'N/A'}) bytes  pull_batch.ps1=$(Get-Item (Get-Command "D:\data\pull_batch.ps1").Source | Select-Object -ExpandProperty Length) bytes"
 Log "Batch 收尾: success=$success failed=$failed"
+# ===== 3h. review_queue 集成 =====
+& "D:\data\review_queue.ps1" -ProgressFile $ProgressFile -QueueFile "D:\data\拉取进度.review_queue.json"
 if ($abortByRate) { exit 2 } else { exit 0 }

@@ -25,3 +25,14 @@ batch_log/
 # OS 杂项
 Thumbs.db
 .DS_Store
+
+# 数据目录 - 保留结构，不跟踪 CSV
+A-shares/*.csv
+A-shares/.backup_20260607/*
+etf/*.csv
+index/*.csv
+
+# 归档、备份、临时文件
+_archive/
+_backup/
+_tmp/
