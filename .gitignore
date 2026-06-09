@@ -39,3 +39,7 @@ _tmp/
 
 # 商业 AI agent（不随工程分发）
 .agents/
+
+# 运行时进度文件（自动生成，频繁变更）
+拉取进度.json
+拉取进度.review_queue.json

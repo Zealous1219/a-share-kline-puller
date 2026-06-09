@@ -1,0 +1,21 @@
+{
+    "lastUpdatedAt": "2026-01-01T00:00:00Z",
+    "pendingReview": {
+        "sh.600000": {
+            "category": "sh_main",
+            "rows": null,
+            "firstDate": null,
+            "historyStatus": "failed",
+            "needsManualReview": true,
+            "addedAt": "2026-01-01T00:00:00Z"
+        },
+        "sh.600001": {
+            "category": "sh_main",
+            "rows": 5,
+            "firstDate": "2025/12/20",
+            "historyStatus": "short_history",
+            "needsManualReview": true,
+            "addedAt": "2026-01-01T00:00:00Z"
+        }
+    }
+}

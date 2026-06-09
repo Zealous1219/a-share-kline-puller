@@ -8,36 +8,36 @@
 
 - Windows + PowerShell 5.1
 - Node.js（用于 JSON 数据处理）
-- [Wind AIFin 平台](https://aifinmarket.wind.com.cn/) 账号（需开通 API 权限获取 key）
+- [Wind AIFin 平台](https://aifinmarket.wind.com.cn/) 账号（注册后安装 Wind MCP Skill 并获取 API key。建议将 Skill 安装在工程根目录下，否则需手动调整脚本路径）
 
 ---
 
 ## 目录结构
 
 ```
-D:\data\
-├── pull_batch.ps1              # 主拉取脚本
-├── convert_kline.ps1           # Wind JSON → CSV 转换（内部调用）
-├── review_queue.ps1            # 审核队列扫描
-├── fix_progress_top.ps1        # 进度文件结构修复（阶段1遗留）
-├── fix_progress_totals.ps1     # 进度文件分类汇总修复（阶段1遗留）
-├── patch_csv_code.ps1          # CSV code 格式修补（阶段1遗留）
-├── 拉取进度.json                # 进度追踪（v1.3 schema）
-├── 拉取进度.review_queue.json  # 审核队列输出
-├── .keys.json                  # API key（gitignored）
+项目根目录\
+├── pull_batch.ps1                      # 主拉取脚本
+├── convert_kline.ps1                   # Wind JSON → CSV 转换（内部调用）
+├── review_queue.ps1                    # 审核队列扫描
+├── fix_progress_top.ps1                # 进度文件结构修复（阶段1遗留）
+├── fix_progress_totals.ps1             # 进度文件分类汇总修复（阶段1遗留）
+├── patch_csv_code.ps1                  # CSV code 格式修补（阶段1遗留）
+├── 拉取进度.json                        # 进度追踪（v1.3 schema，自动生成）
+├── 拉取进度.json.sample                # 进度文件结构示例（首次使用参考）
+├── 拉取进度.review_queue.json          # 审核队列输出（自动生成）
+├── 拉取进度.review_queue.json.sample  # 审核队列结构示例
+├── .keys.json                          # API key（gitignored）
 ├── .gitignore
 ├── lists/
-│   └── stock_list.csv          # 源股票列表（category, symbol）
-├── A-shares/                   # A 股 CSV（sh_main+sz_main+chinext+star+sme）
-├── etf/                        # ETF CSV
-├── index/                      # 指数 CSV
-├── batch_log/                  # 每日拉取日志
-├── _backup/
-│   ├── baseline/               #   阶段1基线文件
-│   ├── progress/               #   进度文件备份
-│   └── scripts/                #   脚本历史版本
-├── _tmp/                       # 临时文件（gitignored）
-└── _archive/                   # 归档（旧分析脚本，gitignored）
+│   └── stock_list.csv                  # 源股票列表（category, symbol）
+├── A-shares/                           # A 股 CSV（数据目录，仅保留结构）
+├── etf/                                # ETF CSV（数据目录，仅保留结构）
+├── index/                              # 指数 CSV（数据目录，仅保留结构）
+├── batch_log/                          # 每日拉取日志（自动生成）
+├── _backup/                            # 自动备份（进度文件 + 脚本版本）
+├── _tmp/                               # 临时文件
+├── _archive/                           # 旧分析脚本归档
+└── .agents/                            # Wind MCP Skill（需自行安装）
 ```
 
 ---
@@ -119,38 +119,41 @@ D:\data\
 
 ### 场景 A：首次配置
 
-1. 前往 [Wind AIFin 平台](https://aifinmarket.wind.com.cn/) 注册账号并获取 API key
+1. 前往 [Wind AIFin 平台](https://aifinmarket.wind.com.cn/) 注册账号、安装 Wind MCP Skill（建议安装在工程根目录下，否则需手动调整脚本中的 skill 路径），并获取 API key
+
 2. 创建本地 key 配置：
 
 ```powershell
-# 编辑 D:\data\.keys.json，格式如下：
+# 编辑 .keys.json，格式如下：
 # {"version":"1.0","defaultKeyId":"main","keys":[{"id":"main","value":"ak_xxxxx","note":"主 key"}]}
 ```
 
-3. 确认股票列表存在：
+3. （首次使用）若 `拉取进度.json` 不存在，脚本会自动从 `lists/stock_list.csv` 初始化。也可参考 `拉取进度.json.sample` 了解结构。
+
+4. 确认股票列表存在：
 
 ```powershell
-Get-Content D:\data\lists\stock_list.csv | Select-Object -First 3
+Get-Content .\lists\stock_list.csv | Select-Object -First 3
 # 应输出：category,symbol  /  chinext,300001.SZ  /  chinext,300002.SZ
 ```
 
-4. 测试单只拉取：
+5. 测试单只拉取：
 
 ```powershell
-& "D:\data\pull_batch.ps1" -Category sh_main -Count 1
+.\pull_batch.ps1 -Category sh_main -Count 1
 ```
 
 ### 场景 B：日常批量拉取
 
 ```powershell
 # 拉取 300 只创业板股票
-& "D:\data\pull_batch.ps1" -Category chinext -Count 300
+.\pull_batch.ps1 -Category chinext -Count 300
 
 # 拉取 300 只沪市主板
-& "D:\data\pull_batch.ps1" -Category sh_main -Count 300
+.\pull_batch.ps1 -Category sh_main -Count 300
 
 # 单批失败后重跑（同一命令，自动跳过已完成条目）
-& "D:\data\pull_batch.ps1" -Category chinext -Count 200
+.\pull_batch.ps1 -Category chinext -Count 200
 ```
 
 ### 场景 C：换 API key
@@ -167,13 +170,13 @@ Get-Content D:\data\lists\stock_list.csv | Select-Object -First 3
 
 ```powershell
 # 1. 生成审核队列
-& "D:\data\review_queue.ps1"
+.\review_queue.ps1
 
 # 2. 查看审核结果
-Get-Content "D:\data\拉取进度.review_queue.json" -Encoding UTF8
+Get-Content ".\拉取进度.review_queue.json" -Encoding UTF8
 
 # 3. 释放卡死的锁（-ForceReclaim）
-& "D:\data\pull_batch.ps1" -Category chinext -Count 100 -ForceReclaim
+.\pull_batch.ps1 -Category chinext -Count 100 -ForceReclaim
 ```
 
 如果某只股票被标记为 `abandoned` 需要恢复，编辑 `拉取进度.json`，将该条目 `status` 从 `"abandoned"` 改为 `"pending"`。
@@ -182,14 +185,14 @@ Get-Content "D:\data\拉取进度.review_queue.json" -Encoding UTF8
 
 ```powershell
 # 统计各类别 success / pending / abandoned
-node -e "const d=require('D:\\data\\拉取进度.json');const s=Object.values(d.stocks);const cat=s=>s.reduce((a,x)=>{const c=x.category;a[c]=a[c]||{t:0,ok:0,pend:0,abn:0};a[c].t++;if(x.status==='success')a[c].ok++;if(x.status==='pending')a[c].pend++;if(x.status==='abandoned')a[c].abn++;return a},{});const r=cat(s);Object.keys(r).forEach(k=>console.log(k+': total='+r[k].t+' success='+r[k].ok+' pending='+r[k].pend+' abandoned='+r[k].abn))"
+node -e "const d=require('./拉取进度.json');const s=Object.values(d.stocks);const cat=s=>s.reduce((a,x)=>{const c=x.category;a[c]=a[c]||{t:0,ok:0,pend:0,abn:0};a[c].t++;if(x.status==='success')a[c].ok++;if(x.status==='pending')a[c].pend++;if(x.status==='abandoned')a[c].abn++;return a},{});const r=cat(s);Object.keys(r).forEach(k=>console.log(k+': total='+r[k].t+' success='+r[k].ok+' pending='+r[k].pend+' abandoned='+r[k].abn))"
 ```
 
 ### 场景 F：多设备同步
 
 ```powershell
 # 在源设备上确认最新进度
-# 将 D:\data\ 整个复制到目标设备的 D:\data\
+# 将整个项目目录复制到目标设备
 # 注意：拉取进度.json 中的 updatedBy 字段会标记来源设备名
 ```
 
@@ -199,7 +202,7 @@ node -e "const d=require('D:\\data\\拉取进度.json');const s=Object.values(d.
 
 ```powershell
 # 恢复指定备份
-Copy-Item "D:\data\_backup\progress\拉取进度.json.bak_pre_batch_20260608T192329Z.json" "D:\data\拉取进度.json"
+Copy-Item ".\_backup\progress\拉取进度.json.bak_pre_batch_20260608T192329Z.json" ".\拉取进度.json"
 ```
 
 ---
@@ -285,7 +288,7 @@ pending → claimed → in_progress → success （正常路径）
 启动时脚本会自动提示存在卡死的锁，但不会自动回收。使用 `-ForceReclaim` 参数手动接管：
 
 ```powershell
-& "D:\data\pull_batch.ps1" -Category chinext -Count 300 -ForceReclaim
+.\pull_batch.ps1 -Category chinext -Count 300 -ForceReclaim
 ```
 
 ### abandoned 条目恢复

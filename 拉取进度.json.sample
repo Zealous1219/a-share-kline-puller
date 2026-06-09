@@ -1,0 +1,72 @@
+{
+    "lastUpdatedBy": "your-pc",
+    "version": "1.3",
+    "lastUpdatedAt": "2026-01-01T00:00:00+08:00",
+    "categories": {
+        "sh_main": {
+            "total": 1706,
+            "completed": 0,
+            "failed": 0,
+            "pending": 1706
+        },
+        "sz_main": {
+            "total": 532,
+            "completed": 0,
+            "failed": 0,
+            "pending": 532
+        },
+        "chinext": {
+            "total": 1399,
+            "completed": 0,
+            "failed": 0,
+            "pending": 1399
+        },
+        "star": {
+            "total": 610,
+            "completed": 0,
+            "failed": 0,
+            "pending": 610
+        },
+        "sme": {
+            "total": 963,
+            "completed": 0,
+            "failed": 0,
+            "pending": 963
+        },
+        "etf": {
+            "total": 1545,
+            "completed": 0,
+            "failed": 0,
+            "pending": 1545
+        },
+        "index": {
+            "total": 507,
+            "completed": 0,
+            "failed": 0,
+            "pending": 507
+        }
+    },
+    "stocks": {
+        "sh.600000": {
+            "status": "pending",
+            "category": "sh_main",
+            "windCode": "600000.SH",
+            "server": "stock_data",
+            "updatedBy": null,
+            "updatedAt": null,
+            "error": null,
+            "failCount": null,
+            "rows": null,
+            "file": null,
+            "firstDate": null,
+            "lastDate": null,
+            "leaseUntil": null,
+            "heartbeatAt": null,
+            "claimedAt": null,
+            "claimedBy": null,
+            "historyStatus": null,
+            "historyReason": null,
+            "needsManualReview": false
+        }
+    }
+}
