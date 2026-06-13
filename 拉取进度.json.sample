@@ -67,6 +67,27 @@
             "historyStatus": null,
             "historyReason": null,
             "needsManualReview": false
+        },
+        "sz.399106": {
+            "status": "success",
+            "category": "index",
+            "windCode": "399106.SZ",
+            "server": "baostock",
+            "updatedBy": "YOUR-PC:main",
+            "updatedAt": "2026-06-14T00:00:00Z",
+            "error": null,
+            "failCount": 0,
+            "rows": 8585,
+            "file": "index_technicals/sz_399106.csv",
+            "firstDate": "1991/4/4",
+            "lastDate": "2026/6/10",
+            "leaseUntil": null,
+            "heartbeatAt": null,
+            "claimedAt": null,
+            "claimedBy": null,
+            "historyStatus": "normal",
+            "historyReason": null,
+            "needsManualReview": false
         }
     }
 }

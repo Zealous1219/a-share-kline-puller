@@ -31,6 +31,7 @@ A-shares/*.csv
 A-shares/.backup_20260607/*
 etf/*.csv
 index/*.csv
+index_technicals/*.csv
 
 # 归档、备份、临时文件
 _archive/

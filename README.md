@@ -1,6 +1,6 @@
 # A 股日 K 数据拉取系统
 
-基于 Wind API 的全量 A 股日 K（前复权）批量拉取工具集。覆盖沪深主板、创业板、科创板、中小板、STAR、ETF 和指数，不含退市股和北交所。
+基于 Wind API + BaoStock 的全量 A 股日 K（前复权）批量拉取工具集。覆盖沪深主板、创业板、科创板、中小板、STAR、ETF 和指数，不含退市股和北交所。
 
 ---
 
@@ -8,6 +8,7 @@
 
 - Windows + PowerShell 5.1
 - Node.js（用于 JSON 数据处理）
+- Python 3.x + baostock（指数补拉用，`pip install baostock`）
 - [Wind AIFin 平台](https://aifinmarket.wind.com.cn/) 账号（注册后安装 Wind MCP Skill 并获取 API key。建议将 Skill 安装在工程根目录下，否则需手动调整脚本路径）
 
 ---
@@ -18,6 +19,7 @@
 项目根目录\
 ├── pull_batch.ps1                      # 主拉取脚本
 ├── convert_kline.ps1                   # Wind JSON → CSV 转换（内部调用）
+├── pull_index_baostock.py              # BaoStock 指数补拉脚本（Python）
 ├── review_queue.ps1                    # 审核队列扫描
 ├── fix_progress_top.ps1                # 进度文件结构修复（阶段1遗留）
 ├── fix_progress_totals.ps1             # 进度文件分类汇总修复（阶段1遗留）
@@ -32,7 +34,8 @@
 │   └── stock_list.csv                  # 源股票列表（category, symbol）
 ├── A-shares/                           # A 股 CSV（数据目录，仅保留结构）
 ├── etf/                                # ETF CSV（数据目录，仅保留结构）
-├── index/                              # 指数 CSV（数据目录，仅保留结构）
+├── index/                              # 指数 CSV（Wind 拉取的上证指数系列，仅保留结构）
+├── index_technicals/                   # 指数 CSV（BaoStock 补拉的深市指数系列，仅保留结构）
 ├── batch_log/                          # 每日拉取日志（自动生成）
 ├── _backup/                            # 自动备份（进度文件 + 脚本版本）
 ├── _tmp/                               # 临时文件
@@ -83,7 +86,7 @@
 
 ### `pull_batch.ps1`（核心）
 
-批量拉取脚本，负责从 Wind API 获取日 K 数据并写入 `拉取进度.json`。每次调用按以下流程执行：
+批量拉取脚本，负责从 Wind API / BaoStock 获取日 K 数据并写入 `拉取进度.json`。每次调用按以下流程执行：
 
 1. 启动校验（9 项）：keys 文件、进度文件、磁盘空间、今日计数、锁定状态等
 2. 锁定目标条目（status → `claimed`，写入 `leaseUntil`）
@@ -109,6 +112,22 @@
 
 扫描 `拉取进度.json` 中 `needsManualReview=true` 的条目，输出到 `拉取进度.review_queue.json`。
 
+### `pull_index_baostock.py`（指数补拉）
+
+Python 脚本，通过 BaoStock 免费 API 补拉 Wind 无法覆盖的深市指数。支持：
+
+- 内置重连逻辑（连接断开时自动 logout + login）
+- 内置 rate limiting（每只间隔 1.5s，避免服务端限制）
+- 输出到 `index_technicals/`，自动更新 `拉取进度.json`
+
+```bash
+# 拉取全部待补拉指数
+python pull_index_baostock.py
+
+# 拉取指定数量
+python pull_index_baostock.py 50
+```
+
 ### 其他脚本
 
 `fix_progress_top.ps1`、`fix_progress_totals.ps1`、`patch_csv_code.ps1` 为阶段 1 遗留的修补脚本，数据迁移完成后不再需要，保留作为参考。
@@ -125,7 +144,7 @@
 
 ```powershell
 # 编辑 .keys.json，格式如下：
-# {"version":"1.0","defaultKeyId":"main","keys":[{"id":"main","value":"ak_xxxxx","note":"主 key"}]}
+# {"version":"1.0","defaultKeyId":"main","keys":[{"id":"main","value":"your-api-key-here","note":"主 key"}]}
 ```
 
 3. （首次使用）若 `拉取进度.json` 不存在，脚本会自动从 `lists/stock_list.csv` 初始化。也可参考 `拉取进度.json.sample` 了解结构。
@@ -161,7 +180,7 @@ Get-Content .\lists\stock_list.csv | Select-Object -First 3
 `拉取进度.json` 结构无需改动，只需编辑 `.keys.json` 的 `value` 字段：
 
 ```json
-{"version":"1.0","defaultKeyId":"main","keys":[{"id":"main","value":"ak_新key","note":"主 key"}]}
+{"version":"1.0","defaultKeyId":"main","keys":[{"id":"main","value":"your-new-api-key","note":"主 key"}]}
 ```
 
 换完直接运行拉取命令即可。
@@ -202,7 +221,19 @@ node -e "const d=require('./拉取进度.json');const s=Object.values(d.stocks);
 
 ```powershell
 # 恢复指定备份
-Copy-Item ".\_backup\progress\拉取进度.json.bak_pre_batch_20260608T192329Z.json" ".\拉取进度.json"
+Copy-Item ".\_backup\progress\拉取进度.json.bak_pre_batch_*.json" ".\拉取进度.json"
+```
+
+### 场景 H：深市指数补拉（BaoStock）
+
+Wind `get_index_kline` 对深市指数系列（399106+ 等）返回空数据，改用 BaoStock 补拉：
+
+```bash
+# 拉取全部待补拉指数
+python pull_index_baostock.py
+
+# 拉取指定数量
+python pull_index_baostock.py 50
 ```
 
 ---
@@ -222,7 +253,7 @@ Copy-Item ".\_backup\progress\拉取进度.json.bak_pre_batch_20260608T192329Z.j
 | `rows` | int | CSV 行数（成功拉取后填入） |
 | `file` | string | CSV 相对路径 |
 | `windCode` | string | Wind 代码格式，如 `600519.SH` |
-| `server` | string | Wind 服务端名称 |
+| `server` | string | 数据来源：Wind 服务端名称 / `baostock` |
 | `updatedBy` | string | `<设备名>:<keyId>` |
 | `updatedAt` | datetime | 最后更新时间 |
 | `error` | string | 错误信息 |
@@ -249,7 +280,7 @@ pending → claimed → in_progress → success （正常路径）
 | 分级 | 含义 | 处理方式 |
 |------|------|----------|
 | `normal` | 数据正常 | 无需处理 |
-| `short_history` | 上市不足 2 年 | 人工确认是否可接受 |
+| `short_history` | 上市不足 2 年 | 经第三方数据源交叉验证后，标记 `needsManualReview=false` 确认通过 |
 | `no_data_candidate` | 上市后无日 K 数据 | 人工确认是否为退市/停牌 |
 
 ---
@@ -306,3 +337,27 @@ pending → claimed → in_progress → success （正常路径）
 
 - 不要在同步前在另一台设备上拉取
 - `updatedBy` 字段自动标记设备名和 keyId，可用于追溯来源
+
+### BaoStock 连接断开 (WinError 10054)
+
+表现：指数补拉过程中报 `远程主机强迫关闭了一个现有的连接`，后续查询全部失败。
+
+原因：BaoStock 服务端对单连接有请求次数限制（约 80-100 次后断连）。
+
+解决：`pull_index_baostock.py` 已内置重连逻辑（自动 logout + login + 1.5s delay），无需手动处理。如仍频繁断连，可适当增大脚本中的 `time.sleep` 间隔。
+
+### 深市指数 Wind 拉取返回空
+
+表现：`get_index_kline` 对 399106+ 系列深市指数返回空数据。
+
+原因：Wind API 对部分深市指数覆盖不全，属 Wind 端限制。
+
+解决：改用 `python pull_index_baostock.py` 通过 BaoStock 补拉，输出到 `index_technicals/`。
+
+### Sina Finance 对新上市 ETF 早期数据覆盖不全
+
+表现：第三方验证时发现 Sina 返回的首日晚于实际上市日期（如 sh.516370 Sina 首日 2026/4/3，实际首日 2026/3/25）。
+
+原因：Sina Finance 对新上市 ETF 的早期交易数据存在缺失，属第三方源缺陷。
+
+解决：以 Wind / BaoStock 数据为准，Sina 仅作参考验证源。如遇此类差异，可交叉验证 yfinance 等其他数据源确认。
