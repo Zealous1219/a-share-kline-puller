@@ -1,0 +1,11 @@
+{
+    "version": "1.0",
+    "defaultKeyId": "main",
+    "keys": [
+        {
+            "id": "main",
+            "value": "your-api-key-here",
+            "note": "主 key（从 Wind AIFin 平台获取）"
+        }
+    ]
+}

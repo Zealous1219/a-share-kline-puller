@@ -1,9 +1,10 @@
 import baostock as bs, json, os, sys, time
 from datetime import datetime, timezone
 
-PROGRESS_FILE = "D:/data/拉取进度.json"
-OUTPUT_DIR = "D:/data/index_technicals"
-KEY_FILE = "D:/data/.keys.json"
+_SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+PROGRESS_FILE = os.path.join(_SCRIPT_DIR, "拉取进度.json")
+OUTPUT_DIR = os.path.join(_SCRIPT_DIR, "index_technicals")
+KEY_FILE = os.path.join(_SCRIPT_DIR, ".keys.json")
 MAX_COUNT = int(sys.argv[1]) if len(sys.argv) > 1 else 0
 
 def log(msg):

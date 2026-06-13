@@ -1,5 +1,5 @@
-﻿$srcDir = "D:\data\A-shares"
-$bakDir = "D:\data\A-shares\.backup_20260607"
+﻿$srcDir = Join-Path $PSScriptRoot "A-shares"
+$bakDir = Join-Path $PSScriptRoot "A-shares\.backup_20260607"
 $pattern = ',(\d{6})\.sh,'
 $replacement = ',sh.$1,'
 

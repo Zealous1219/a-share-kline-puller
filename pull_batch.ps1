@@ -2,12 +2,13 @@
     [Parameter(Mandatory)][string]$Category,
     [Parameter(Mandatory)][int]$Count,
     [string]$StartFrom = "",
-    [string]$ProgressFile = "D:\data\拉取进度.json",
-    [string]$KeysFile = "D:\data\.keys.json",
-    [string]$LogDir = "D:\data\batch_log",
-    [string]$BackupDir = "D:\data\_backup\progress",
-    [string]$TmpDir = "D:\data\_tmp",
+    [string]$ProgressFile = (Join-Path $PSScriptRoot "拉取进度.json"),
+    [string]$KeysFile = (Join-Path $PSScriptRoot ".keys.json"),
+    [string]$LogDir = (Join-Path $PSScriptRoot "batch_log"),
+    [string]$BackupDir = (Join-Path $PSScriptRoot "_backup\progress"),
+    [string]$TmpDir = (Join-Path $PSScriptRoot "_tmp"),
     [string]$KeyId = "",
+    [int]$DailyQuota = 1000,
     [switch]$ForceReclaim
 )
 
@@ -41,7 +42,63 @@ if ([System.IO.File]::Exists($tmpFile)) {
 }
 
 # ===== 9.1 try-parse 进度文件 =====
-if (-not [System.IO.File]::Exists($ProgressFile)) { throw "Progress file not found: $ProgressFile" }
+$stockListFile = Join-Path $PSScriptRoot "lists\stock_list.csv"
+if (-not [System.IO.File]::Exists($ProgressFile)) {
+    if (-not [System.IO.File]::Exists($stockListFile)) {
+        throw "Progress file not found: $ProgressFile (also stock_list.csv missing, cannot auto-init)"
+    }
+    Log "进度文件不存在, 从 stock_list.csv 初始化..."
+    $validCats = @('sh_main','sz_main','chinext','star','sme','etf','index')
+    $categories = [ordered]@{}
+    $stocks = [ordered]@{}
+    foreach ($cat in $validCats) { $categories[$cat] = [ordered]@{ total=0; completed=0; failed=0; pending=0 } }
+    $lines = [System.IO.File]::ReadAllLines($stockListFile, [System.Text.Encoding]::UTF8)
+    foreach ($line in $lines[1..($lines.Count-1)]) {
+        if ([string]::IsNullOrWhiteSpace($line)) { continue }
+        $parts = $line.Split(',')
+        $cat = $parts[0].Trim()
+        $windCode = $parts[1].Trim()
+        if ($validCats -notcontains $cat) { continue }
+        $exch = if ($windCode.EndsWith('.SH')) { 'sh' } elseif ($windCode.EndsWith('.SZ')) { 'sz' } else { continue }
+        $numeric = $windCode.Substring(0, $windCode.IndexOf('.'))
+        $internalCode = "$exch.$numeric"
+        $stocks[$internalCode] = [ordered]@{
+            status = 'pending'
+            category = $cat
+            windCode = $windCode
+            server = $null
+            updatedBy = $null
+            updatedAt = $null
+            error = $null
+            failCount = $null
+            rows = $null
+            file = $null
+            firstDate = $null
+            lastDate = $null
+            leaseUntil = $null
+            heartbeatAt = $null
+            claimedAt = $null
+            claimedBy = $null
+            historyStatus = $null
+            historyReason = $null
+            needsManualReview = $false
+        }
+        $categories[$cat].total++
+        $categories[$cat].pending++
+    }
+    $progress = [ordered]@{
+        lastUpdatedBy = $devName
+        version = '1.3'
+        lastUpdatedAt = (Get-Date).ToString('o')
+        categories = $categories
+        stocks = $stocks
+    }
+    $json = $progress | ConvertTo-Json -Depth 10
+    $tmpInit = "$ProgressFile.tmp"
+    [System.IO.File]::WriteAllText($tmpInit, $json, (New-Object System.Text.UTF8Encoding($false)))
+    [System.IO.File]::Move($tmpInit, $ProgressFile)
+    Log "初始化完成: $($stocks.Count) 只证券, 来源: stock_list.csv"
+} else {
 $progressContent = [System.IO.File]::ReadAllText($ProgressFile, [System.Text.Encoding]::UTF8)
 try {
     $progress = $progressContent | ConvertFrom-Json
@@ -55,6 +112,7 @@ try {
     } else {
         throw "进度文件 parse 失败且无备份: $_"
     }
+}
 }
 
 # ===== 9.6 BOM 检查 =====
@@ -75,7 +133,7 @@ $driveRoot = [System.IO.Path]::GetPathRoot($ProgressFile)[0]
 try {
     $driveInfo = Get-PSDrive -Name $driveRoot -ErrorAction Stop
     $diskFreeGB = [math]::Round($driveInfo.Free / 1GB, 1)
-    $csvDir = "D:\data\A-shares"
+    $csvDir = Join-Path $PSScriptRoot "A-shares"
     $csvSamples = @(Get-ChildItem $csvDir -Filter "*.csv" -ErrorAction SilentlyContinue | Get-Random -Count 5)
     $avgBytes = if ($csvSamples.Count -gt 0) {
         ($csvSamples | ForEach-Object { $_.Length } | Measure-Object -Average).Average
@@ -114,9 +172,9 @@ if ([System.IO.File]::Exists($todayFile)) {
     if ($tc[0] -eq $todayKey) { $todayCount = [int]$tc[1] }
 }
 $todayCount += $Count
-$quotaLeft = 1000 - $todayCount
-if ($quotaLeft -lt $Count) { Log "INFO: 本日 Wind 计数: 已用 $todayCount / 1000, 本批 $Count" }
-Log "当日 Wind 调用计数: $todayCount / 1000"
+$quotaLeft = $DailyQuota - $todayCount
+if ($quotaLeft -lt $Count) { Log "INFO: 本日 Wind 计数: 已用 $todayCount / $DailyQuota, 本批 $Count" }
+Log "当日 Wind 调用计数: $todayCount / $DailyQuota"
 
 $nowUtc = (Get-Date).ToUniversalTime()
 $staleActive = @()
@@ -209,7 +267,7 @@ foreach ($internalCode in $batch) {
 
     try {
         $nodePathJs = $nodePath.Replace('\', '/')
-        $cliMjs = 'D:\data\.agents\skills\wind-mcp-skill\scripts\cli.mjs'.Replace('\', '/')
+        $cliMjs = (Join-Path $PSScriptRoot '.agents\skills\wind-mcp-skill\scripts\cli.mjs').Replace('\', '/')
         $windcode = $stock.windCode
         $callScript = @"
 const { spawnSync } = require('child_process');
@@ -234,8 +292,8 @@ process.stdout.write(result.stdout);
         }
 
         $dir = switch ($Category) { 'etf' { 'etf' } 'index' { 'index' } default { 'A-shares' } }
-        $outPath = "D:\data\$dir\$($sym.Exchange)_$($sym.Code).csv"
-        & D:\data\convert_kline.ps1 -JsonText $rawText -Exchange $sym.Exchange -Code $sym.Code -OutputPath $outPath | Out-Null
+        $outPath = Join-Path $PSScriptRoot "$dir\$($sym.Exchange)_$($sym.Code).csv"
+        & (Join-Path $PSScriptRoot "convert_kline.ps1") -JsonText $rawText -Exchange $sym.Exchange -Code $sym.Code -OutputPath $outPath | Out-Null
 
         $lines = Get-Content -LiteralPath $outPath
         $rowCount = if ($lines.Count -gt 1) { $lines.Count - 1 } else { 0 }
@@ -317,8 +375,9 @@ $gradingNormal = @($progress.stocks.PSObject.Properties.Value | Where-Object { $
 $gradingShort = @($progress.stocks.PSObject.Properties.Value | Where-Object { $_.historyStatus -eq 'short_history' }).Count
 $gradingNoData = @($progress.stocks.PSObject.Properties.Value | Where-Object { $_.historyStatus -eq 'no_data_candidate' }).Count
 $reviewQueueCount = 0
-if ([System.IO.File]::Exists("D:\data\拉取进度.review_queue.json")) {
-    $rq = [System.IO.File]::ReadAllText("D:\data\拉取进度.review_queue.json", [System.Text.Encoding]::UTF8) | ConvertFrom-Json
+$queueFile = Join-Path $PSScriptRoot "拉取进度.review_queue.json"
+if ([System.IO.File]::Exists($queueFile)) {
+    $rq = [System.IO.File]::ReadAllText($queueFile, [System.Text.Encoding]::UTF8) | ConvertFrom-Json
     $reviewQueueCount = @($rq.PSObject.Properties).Count
 }
 
@@ -329,10 +388,10 @@ Log "  grading:  normal=$gradingNormal short_history=$gradingShort no_data_candi
 Log "  disk:     estimated=~${diskEstimatedGB}GB free=${diskFreeGB}GB"
 Log "  schema:   19 fields verified at start"
 Log "  lock:     active=$($staleActive.Count) hist=$historicalTraces"
-Log "  today:    $todayCount / 1000 (quota left=$($quotaLeft - 0))"
+Log "  today:    $todayCount / $DailyQuota (quota left=$($quotaLeft - 0))"
 if ($reviewQueueCount -gt 0) { Log "  review:   $reviewQueueCount entries in review_queue.json" }
-Log "  baseline: progress.json=$(if([System.IO.File]::Exists($ProgressFile)){(Get-Item $ProgressFile).Length}else{'N/A'}) bytes  pull_batch.ps1=$(Get-Item (Get-Command "D:\data\pull_batch.ps1").Source | Select-Object -ExpandProperty Length) bytes"
+Log "  baseline: progress.json=$(if([System.IO.File]::Exists($ProgressFile)){(Get-Item $ProgressFile).Length}else{'N/A'}) bytes  pull_batch.ps1=$(Get-Item $PSCommandPath | Select-Object -ExpandProperty Length) bytes"
 Log "Batch 收尾: success=$success failed=$failed"
 # ===== 3h. review_queue 集成 =====
-& "D:\data\review_queue.ps1" -ProgressFile $ProgressFile -QueueFile "D:\data\拉取进度.review_queue.json"
+& (Join-Path $PSScriptRoot "review_queue.ps1") -ProgressFile $ProgressFile -QueueFile $queueFile
 if ($abortByRate) { exit 2 } else { exit 0 }

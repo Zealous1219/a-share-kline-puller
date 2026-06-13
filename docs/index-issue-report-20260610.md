@@ -90,7 +90,7 @@ Wind代码、证券简称、日期、开盘价、最高价、最低价、收盘�
 1. 从 `拉取进度.json` 中提取 340 个 abandoned index 代码
 2. 对每个指数调用 `get_index_technicals`，请求完整 OHLCV 数据
 3. 将返回数据转换为与现有 CSV 一致的格式
-4. 存入 `D:\data\index\` 目录
+4. 存入 `index/` 目录
 5. 更新 progress 状态为 success
 
 **示例调用**：

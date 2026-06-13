@@ -1,6 +1,6 @@
 ﻿param(
-    [string]$ProgressFile = "D:\data\拉取进度.json",
-    [string]$OutputFile = "D:\data\拉取进度.review_queue.json"
+    [string]$ProgressFile = (Join-Path $PSScriptRoot "拉取进度.json"),
+    [string]$OutputFile = (Join-Path $PSScriptRoot "拉取进度.review_queue.json")
 )
 
 if (-not [System.IO.File]::Exists($ProgressFile)) { throw "Progress file not found: $ProgressFile" }

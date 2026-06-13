@@ -1,4 +1,4 @@
-﻿$pf = "D:\data\拉取进度.json"
+﻿$pf = Join-Path $PSScriptRoot "拉取进度.json"
 $j = Get-Content -LiteralPath $pf -Raw -Encoding UTF8 | ConvertFrom-Json
 
 $catBreak = [ordered]@{}

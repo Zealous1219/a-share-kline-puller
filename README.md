@@ -28,6 +28,7 @@
 ├── 拉取进度.json.sample                # 进度文件结构示例（首次使用参考）
 ├── 拉取进度.review_queue.json          # 审核队列输出（自动生成）
 ├── 拉取进度.review_queue.json.sample  # 审核队列结构示例
+├── .keys.json.sample                    # API key 格式示例（git tracked）
 ├── .keys.json                          # API key（gitignored）
 ├── .gitignore
 ├── lists/
