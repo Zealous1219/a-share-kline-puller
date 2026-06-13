@@ -1,0 +1,16 @@
+# Windows PowerShell scripts (UTF-8 BOM + CRLF)
+*.ps1   text eol=crlf
+
+# Cross-platform scripts
+*.py    text eol=lf
+
+# Data files
+*.csv   text eol=lf
+*.json  text eol=lf
+
+# Documentation
+*.md    text eol=lf
+
+# Binary
+*.png   binary
+*.jpg   binary

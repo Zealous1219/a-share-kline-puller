@@ -1,3 +1,6 @@
+> **⚠️ 本文档为历史探索过程记录，仅供参考。**
+> **最终方案**：详见 [`pull_index_baostock.py`](../pull_index_baostock.py)（BaoStock 补拉）。
+
 # Index 数据拉取问题报告与解决方案
 
 > 生成时间：2026-06-10

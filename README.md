@@ -21,9 +21,6 @@
 ├── convert_kline.ps1                   # Wind JSON → CSV 转换（内部调用）
 ├── pull_index_baostock.py              # BaoStock 指数补拉脚本（Python）
 ├── review_queue.ps1                    # 审核队列扫描
-├── fix_progress_top.ps1                # 进度文件结构修复（阶段1遗留）
-├── fix_progress_totals.ps1             # 进度文件分类汇总修复（阶段1遗留）
-├── patch_csv_code.ps1                  # CSV code 格式修补（阶段1遗留）
 ├── 拉取进度.json                        # 进度追踪（v1.3 schema，自动生成）
 ├── 拉取进度.json.sample                # 进度文件结构示例（首次使用参考）
 ├── 拉取进度.review_queue.json          # 审核队列输出（自动生成）
@@ -43,6 +40,8 @@
 ├── _archive/                           # 旧分析脚本归档
 └── .agents/                            # Wind MCP Skill（需自行安装）
 ```
+
+> **注**：`_backup/`、`_tmp/`、`batch_log/`、`_archive/` 目录在首次运行时脚本自动创建，`git clone` 后不会立即显示。
 
 ---
 
@@ -131,7 +130,7 @@ python pull_index_baostock.py 50
 
 ### 其他脚本
 
-`fix_progress_top.ps1`、`fix_progress_totals.ps1`、`patch_csv_code.ps1` 为阶段 1 遗留的修补脚本，数据迁移完成后不再需要，保留作为参考。
+阶段 1 遗留的三个修复脚本（`fix_progress_top.ps1`、`fix_progress_totals.ps1`、`patch_csv_code.ps1`）已归档至 `_archive/`，不再需要。
 
 ---
 

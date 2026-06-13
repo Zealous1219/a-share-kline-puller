@@ -32,7 +32,7 @@ if (-not $KeyId) { $KeyId = $kj.defaultKeyId }
 $keyEntry = $kj.keys | Where-Object { $_.id -eq $KeyId }
 if (-not $keyEntry) { throw "KeyId not found in .keys.json: $KeyId" }
 $env:WIND_API_KEY = $keyEntry.value
-Log "Using KeyId: $KeyId (ak_***$($keyEntry.value.Substring($keyEntry.value.Length-4)))"
+Log "Using KeyId: $KeyId"
 
 # ===== 9.5 清残留 .tmp =====
 $tmpFile = "$ProgressFile.tmp"
