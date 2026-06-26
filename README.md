@@ -1,6 +1,23 @@
 # A 股日 K 数据拉取系统
 
-基于 Wind API + BaoStock 的全量 A 股日 K（前复权）批量拉取工具集。覆盖沪深主板、创业板、科创板、中小板、STAR、ETF 和指数，不含退市股和北交所。
+![PowerShell](https://img.shields.io/badge/PowerShell-5.1+-5391FE?logo=powershell&logoColor=white)
+![Python](https://img.shields.io/badge/Python-3.x+-3776AB?logo=python&logoColor=white)
+![Wind API](https://img.shields.io/badge/Wind%20API-dual--source-FF6F00)
+![BaoStock](https://img.shields.io/badge/BaoStock-supplement-4CAF50)
+![License](https://img.shields.io/badge/license-MIT-blue)
+
+> Wind API 主源 + BaoStock 补源双架构，PowerShell 脚本集，含 19 字段进度追踪、原子写入与断点续跑。
+
+基于 Wind API + BaoStock 双源架构的 A 股日 K（前复权）数据批量拉取系统，构建稳定的 stock-data pipeline。覆盖沪深主板、创业板、科创板、中小板、STAR、ETF 和指数，为量化金融（quantitative-finance）分析提供长期可用的历史数据。具备 19 字段进度追踪、原子写入、断点续跑、租约锁与自动备份，适合长期大规模数据采集。
+
+## Features
+
+- **双源架构**：Wind API 主源 + BaoStock 补源，解决 Wind 深市指数覆盖不全
+- **全量覆盖**：沪深主板/创业板/科创板/中小板/STAR/ETF/指数（不含退市股和北交所）
+- **工程级容错**：19 字段进度追踪、原子写入、断点续跑、租约锁、自动备份
+- **多设备协同**：updatedBy 字段追溯来源设备，支持多设备分批拉取
+- **PowerShell 5.1 兼容**：UTF-8 with BOM 处理中文路径，原生 .NET IO 绕开 PS 5.1 限制
+- **审核队列**：自动标记 `needsManualReview` 条目，分级处理 short_history / no_data_candidate
 
 ---
 
