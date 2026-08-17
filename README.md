@@ -68,12 +68,20 @@
 
 - 文件名：`{exchange}_{code}.csv`（小写），如 `sh_600519.csv`
 - 文件内 code：`{exchange}.{code}`，如 `sh.600519`
-- 字段顺序：`date, code, open, high, low, close, volume`
+- 字段顺序：`date,code,open,high,low,close,volume,turnover,changehandrate,avprice`
 - 日期格式：`yyyy/M/d`（无前导零），如 `2026/6/8`
 - 行序：按日期升序
 - 编码：UTF-8 无 BOM
 - 行尾：LF（Unix 风格）
-- Volume 字段：原始数据，未做任何处理
+- `volume`：原始数据，未做任何处理
+- `turnover`：原始成交额，单位为元；保留 Wind 原始元值，不换算
+- `changehandrate`：原始换手率；保留 Wind 原始值，不乘除 100
+- `avprice`：原始均价；保留 Wind 原始值，不重新计算
+
+```csv
+date,code,open,high,low,close,volume,turnover,changehandrate,avprice
+2024/6/3,sh.600000,9.90,10.30,9.70,10.10,1000,123456.789,1.23,10.25
+```
 
 ### Wind API 参数
 

@@ -5,33 +5,44 @@ param(
     [Parameter(Mandatory)][string]$OutputPath
 )
 
-if ($JsonText[0] -eq "`u{FEFF}") { $JsonText = $JsonText.Substring(1) }
+if ($JsonText.Length -gt 0 -and $JsonText[0] -eq [char]0xFEFF) {
+    $JsonText = $JsonText.Substring(1)
+}
 
 $outer = $JsonText | ConvertFrom-Json
 $inner = $outer.content[0].text | ConvertFrom-Json
 
-$cols = $inner.data.columns | ForEach-Object { $_.name }
+$cols = @($inner.data.columns | ForEach-Object { $_.name })
+$dateField = if ($cols.IndexOf('_DATE') -ge 0) { '_DATE' } else { 'TIME' }
 $idx = @{
-    date   = $cols.IndexOf('_DATE')
-    open   = $cols.IndexOf('OPEN')
-    high   = $cols.IndexOf('HIGH')
-    low    = $cols.IndexOf('LOW')
-    close  = $cols.IndexOf('MATCH')
+    date = $cols.IndexOf($dateField)
+    open = $cols.IndexOf('OPEN')
+    high = $cols.IndexOf('HIGH')
+    low = $cols.IndexOf('LOW')
+    close = $cols.IndexOf('MATCH')
     volume = $cols.IndexOf('VOLUME')
+    turnover = $cols.IndexOf('TURNOVER')
+    changehandrate = $cols.IndexOf('CHANGEHANDRATE')
+    avprice = $cols.IndexOf('AVPRICE')
 }
 
 $codeFmt = "$Exchange.$Code"
 $sb = New-Object System.Text.StringBuilder
-[void]$sb.AppendLine("date,code,open,high,low,close,volume")
+[void]$sb.AppendLine("date,code,open,high,low,close,volume,turnover,changehandrate,avprice")
 
 if ($inner.data.rows) {
     foreach ($row in $inner.data.rows) {
         $raw = $row[$idx.date]
-        $y = $raw.Substring(0,4)
-        $m = [int]$raw.Substring(4,2)
-        $d = [int]$raw.Substring(6,2)
-        $dateFmt = "$y/$m/$d"
-        $line = "$dateFmt,$codeFmt,$($row[$idx.open]),$($row[$idx.high]),$($row[$idx.low]),$($row[$idx.close]),$($row[$idx.volume])"
+        if ($dateField -eq '_DATE') {
+            $y = $raw.Substring(0,4)
+            $m = [int]$raw.Substring(4,2)
+            $d = [int]$raw.Substring(6,2)
+            $dateFmt = "$y/$m/$d"
+        } else {
+            $date = [datetimeoffset]::Parse([string]$raw).Date
+            $dateFmt = "$($date.Year)/$($date.Month)/$($date.Day)"
+        }
+        $line = "$dateFmt,$codeFmt,$($row[$idx.open]),$($row[$idx.high]),$($row[$idx.low]),$($row[$idx.close]),$($row[$idx.volume]),$($row[$idx.turnover]),$($row[$idx.changehandrate]),$($row[$idx.avprice])"
         [void]$sb.AppendLine($line)
     }
 }

@@ -15,7 +15,7 @@ def query_with_retry(code, max_retries=5):
     for attempt in range(1, max_retries + 1):
         rs = bs.query_history_k_data_plus(
             code,
-            "date,code,open,high,low,close,volume",
+            "date,code,open,high,low,close,volume,amount,turn",
             start_date="1990-01-01", end_date="2026-12-31",
             frequency="d", adjustflag="2"
         )
@@ -103,7 +103,7 @@ def main():
             failed += 1
             continue
         
-        # 转换 CSV: YYYY/M/D 格式, 无前导0, field order: date,code,open,high,low,close,volume
+        # 转换 CSV: YYYY/M/D 格式, 无前导0, avprice 无可靠 BaoStock 来源，保留为空。
         csv_rows = []
         for r in rows:
             dt = r[0]  # YYYY-MM-DD
@@ -114,7 +114,7 @@ def main():
             # 跳过 OHLCV 全部为空的行
             if not r[5] or r[5].strip() == "":
                 continue
-            csv_rows.append(f"{date_fmt},{internal_code},{r[2]},{r[3]},{r[4]},{r[5]},{r[6]}")
+            csv_rows.append(f"{date_fmt},{internal_code},{r[2]},{r[3]},{r[4]},{r[5]},{r[6]},{r[7]},{r[8]},")
         
         if len(csv_rows) == 0:
             log(f"  [{i+1}/{total}] {code}: 过滤后无有效数据")
@@ -123,7 +123,7 @@ def main():
         
         # 写文件 (原子写: 先写 .tmp 再 rename)
         tmp_path = output_csv + ".tmp"
-        csv_content = "date,code,open,high,low,close,volume\n" + "\n".join(csv_rows) + "\n"
+        csv_content = "date,code,open,high,low,close,volume,turnover,changehandrate,avprice\n" + "\n".join(csv_rows) + "\n"
         with open(tmp_path, "w", encoding="utf-8", newline="\n") as f:
             f.write(csv_content)
         os.replace(tmp_path, output_csv)

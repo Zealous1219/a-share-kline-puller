@@ -1,0 +1,7 @@
+{
+  "content": [
+    {
+      "text": "{\"data\":{\"columns\":[{\"name\":\"TIME\"},{\"name\":\"OPEN\"},{\"name\":\"MATCH\"},{\"name\":\"HIGH\"},{\"name\":\"LOW\"},{\"name\":\"TURNOVER\"},{\"name\":\"VOLUME\"},{\"name\":\"CHANGEHANDRATE\"},{\"name\":\"AVPRICE\"}],\"rows\":[]}}"
+    }
+  ]
+}

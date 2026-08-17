@@ -14,7 +14,16 @@
 | `index/` | Wind `get_index_kline` | 167 只（上证指数系列） | 已完成 |
 | `index_technicals/` | BaoStock | 340 只（深市指数系列） | 已完成 |
 
-两个目录数据源不同，但字段格式完全一致（`date,code,open,high,low,close,volume`），可直接合并使用，无需二次转换。
+两个目录数据源不同，但字段格式完全一致（`date,code,open,high,low,close,volume,turnover,changehandrate,avprice`），可直接合并使用，无需二次转换。
+
+BaoStock 字段映射如下：
+
+| CSV 字段 | BaoStock 字段 | 说明 |
+|---|---|---|
+| `volume` | `volume` | 原始成交量，不做处理 |
+| `turnover` | `amount` | 原始成交额，单位为元，不换算 |
+| `changehandrate` | `turn` | 原始换手率，不乘除 100 |
+| `avprice` | 无可靠来源 | 始终留空，不用成交额/成交量推算 |
 
 BaoStock 前复权结果与 Wind 前复权一致（已通过 399234.SZ 交叉验证，60 交易日价量 0% 差异）。
 
