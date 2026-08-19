@@ -26,7 +26,7 @@
 - Windows + PowerShell 5.1
 - Node.js（用于 JSON 数据处理）
 - Python 3.x + baostock（指数补拉用，`pip install baostock`）
-- [Wind AIFin 平台](https://aifinmarket.wind.com.cn/) 账号（注册后安装 Wind MCP Skill 并获取 API key。建议将 Skill 安装在工程根目录下，否则需手动调整脚本路径）
+- [Wind AIFin 平台](https://aifinmarket.wind.com.cn/) 账号、Wind MCP Skill 和 API key。Skill 必须安装在项目根目录下的 `.agents\skills\wind-mcp-skill\`，脚本会从 `.agents\skills\wind-mcp-skill\scripts\cli.mjs` 调用它。
 
 ---
 
@@ -68,12 +68,20 @@
 
 - 文件名：`{exchange}_{code}.csv`（小写），如 `sh_600519.csv`
 - 文件内 code：`{exchange}.{code}`，如 `sh.600519`
-- 字段顺序：`date, code, open, high, low, close, volume`
+- 字段顺序：`date,code,open,high,low,close,volume,turnover,changehandrate,avprice`
 - 日期格式：`yyyy/M/d`（无前导零），如 `2026/6/8`
-- 行序：按日期升序
+- 行序：Wind/BaoStock 正常返回通常按日期升序；转换器保留接口返回顺序，不额外排序
 - 编码：UTF-8 无 BOM
 - 行尾：LF（Unix 风格）
-- Volume 字段：原始数据，未做任何处理
+- `volume`：原始数据，未做任何处理
+- `turnover`：原始成交额，单位为元；保留 Wind 原始元值，不换算
+- `changehandrate`：原始换手率；保留 Wind 原始值，不乘除 100
+- `avprice`：原始均价；保留 Wind 原始值，不重新计算
+
+```csv
+date,code,open,high,low,close,volume,turnover,changehandrate,avprice
+2024/6/3,sh.600000,9.90,10.30,9.70,10.10,1000,123456.789,1.23,10.25
+```
 
 ### Wind API 参数
 
@@ -119,6 +127,7 @@
 | `-Count` | 是 | 本批拉取数量 |
 | `-StartFrom` | 否 | 从指定 code 开始（用于断点续跑） |
 | `-KeyId` | 否 | API key ID，缺省用 `.keys.json` 的 `defaultKeyId` |
+| `-DailyQuota` | 否 | 当日 Wind 调用计数提示上限，默认 `1000`；仅用于提示，不会阻止请求 |
 | `-ForceReclaim` | 否 | 强制接管卡死的锁 |
 
 ### `convert_kline.ps1`（内部调用）
@@ -155,16 +164,24 @@ python pull_index_baostock.py 50
 
 ### 场景 A：首次配置
 
-1. 前往 [Wind AIFin 平台](https://aifinmarket.wind.com.cn/) 注册账号、安装 Wind MCP Skill（建议安装在工程根目录下，否则需手动调整脚本中的 skill 路径），并获取 API key
+1. 前往 [Wind AIFin 平台](https://aifinmarket.wind.com.cn/) 注册账号并获取 API key。安装 Wind MCP Skill 到以下固定路径：
+
+   ```text
+   <项目根目录>\.agents\skills\wind-mcp-skill\
+   ```
+
+   `pull_batch.ps1` 需要在该目录下找到 `scripts\cli.mjs`；`.agents/` 被 Git 忽略，因此需要在每台使用设备上单独安装。
 
 2. 创建本地 key 配置：
 
 ```powershell
-# 编辑 .keys.json，格式如下：
-# {"version":"1.0","defaultKeyId":"main","keys":[{"id":"main","value":"your-api-key-here","note":"主 key"}]}
+Copy-Item .keys.json.sample .keys.json
+notepad .keys.json
 ```
 
-3. （首次使用）若 `拉取进度.json` 不存在，脚本会自动从 `lists/stock_list.csv` 初始化。也可参考 `拉取进度.json.sample` 了解结构。
+将 `value` 替换为真实 API key；`.keys.json` 已被 Git 忽略，不要提交到仓库。
+
+3. （首次使用）先运行一次主脚本。若 `拉取进度.json` 不存在，脚本会自动从 `lists/stock_list.csv` 初始化；也可参考 `拉取进度.json.sample` 了解结构。
 
 4. 确认股票列表存在：
 
@@ -243,7 +260,7 @@ Copy-Item ".\_backup\progress\拉取进度.json.bak_pre_batch_*.json" ".\拉取�
 
 ### 场景 H：深市指数补拉（BaoStock）
 
-Wind `get_index_kline` 对深市指数系列（399106+ 等）返回空数据，改用 BaoStock 补拉：
+先完成场景 A，并至少运行一次 `pull_batch.ps1` 生成 `拉取进度.json`。Wind 批量拉取结束后，Wind 无法覆盖的深市指数（399106+ 等）由 BaoStock 补拉。BaoStock 脚本还会读取 `.keys.json` 的设备/Key 标识，因此每台设备都需要先创建该文件：
 
 ```bash
 # 拉取全部待补拉指数
